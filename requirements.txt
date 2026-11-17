@@ -8,3 +8,5 @@ seaborn
 shap
 xgboost
 rapidfuzz
+fastapi
+uvicorn[standard]
