@@ -21,3 +21,6 @@ artifacts/
 # Python temporary files
 __pycache__/
 .ipynb_checkpoints/
+
+# Local Docker configuration
+docker.env.local
