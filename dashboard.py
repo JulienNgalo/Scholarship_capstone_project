@@ -100,7 +100,7 @@ def result_metrics(scores: pd.DataFrame, threshold: float):
 
 
 def display_table(scores: pd.DataFrame, key: str, selection_callback):
-    columns = ["Student ID", "Approval %", "Predicted status", "Mean Grade", "County", "Course"]
+    columns = ["Student ID", "High School", "Approval %", "Predicted status", "Mean Grade", "County", "Course"]
     display = scores.copy()
     display["Approval %"] = display["Approval probability"] * 100.0
     event = st.dataframe(
@@ -252,6 +252,22 @@ def batch_page(artifact):
             display_table(shortlisted, "shortlist_table", shortlist_clicked)
             st.download_button("Export predicted shortlist", csv_download(shortlisted),
                                file_name="fao_predicted_shortlist.csv", mime="text/csv")
+
+        # Keep both ranked tables together on the left. Their row selections
+        # update the same SHAP detail panel on the right.
+        st.divider()
+        st.markdown("#### Ranked predicted Not Approved")
+        st.caption("Highest probability among non-shortlisted first. Click to inspect.")
+        if not_shortlisted.empty:
+            st.info("No applicants below the threshold.")
+        else:
+            def not_shortlist_clicked():
+                selected_rows = st.session_state["not_shortlist_table"]["selection"]["rows"]
+                if selected_rows:
+                    st.session_state["selected_csv_row"] = int(not_shortlisted.iloc[selected_rows[0]]["_row_number"])
+            display_table(not_shortlisted, "not_shortlist_table", not_shortlist_clicked)
+            st.download_button("Export predicted Not Approved", csv_download(not_shortlisted),
+                               file_name="fao_predicted_not_shortlisted.csv", mime="text/csv")
         st.download_button("Export all scored applicants", csv_download(scores),
                            file_name="fao_all_predictions.csv", mime="text/csv")
     with side:
@@ -269,19 +285,6 @@ def batch_page(artifact):
             st.warning(selected["Check notes"])
         explain_selected(batch.features.loc[[selected_row]], artifact,
                          float(selected["Approval probability"]))
-        st.divider()
-        st.markdown("#### Ranked predicted Not Approved")
-        st.caption("Highest probability among non-shortlisted first. Click to inspect.")
-        if not_shortlisted.empty:
-            st.info("No applicants below the threshold.")
-        else:
-            def not_shortlist_clicked():
-                selected_rows = st.session_state["not_shortlist_table"]["selection"]["rows"]
-                if selected_rows:
-                    st.session_state["selected_csv_row"] = int(not_shortlisted.iloc[selected_rows[0]]["_row_number"])
-            display_table(not_shortlisted, "not_shortlist_table", not_shortlist_clicked)
-            st.download_button("Export predicted Not Approved", csv_download(not_shortlisted),
-                               file_name="fao_predicted_not_shortlisted.csv", mime="text/csv")
 
 
 st.title("FAO  |  Scholarship Decision Support")
