@@ -1,0 +1,12 @@
+{
+  "source_rows": 2501,
+  "kenya_rows_before_exact_dedup": 2269,
+  "exact_duplicates_removed": 0,
+  "remaining_rows": 2269,
+  "unique_student_ids": 2132,
+  "repeated_student_ids": 127,
+  "repeated_id_course_groups": 0,
+  "eligible_rows": 2241,
+  "ineligible_rows": 28,
+  "unclassified_rows": 0
+}

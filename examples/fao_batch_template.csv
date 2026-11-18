@@ -1,0 +1,5 @@
+student_id,mean_grade,o_level_year,county,date_applied,high_school,parent_status,course
+EXAMPLE-001,B+,2023,Nairobi,2026-11-18,Alliance High School,Both Parents,Bachelor of Commerce
+EXAMPLE-002,C,2019,Wajir,2026-11-18,British International School,Both Parents,Bachelor of Arts International Studies
+EXAMPLE-003,B,2024,Kiambu,2026-11-18,Alliance Girls High School,Mother Deceased,Master of Business Administration
+EXAMPLE-004,B-,2023,Nairobi,2026-11-18,Alliance High School,Both Parents,CPA
