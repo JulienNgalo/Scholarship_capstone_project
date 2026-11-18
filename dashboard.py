@@ -48,7 +48,7 @@ def get_explainer():
 
 
 def probability_chart(baseline: float, effects: pd.DataFrame, probability: float):
-    """Display signed SHAP contributions for the ten original model features."""
+    """Display signed SHAP contributions for the nine predictive features."""
     ranked = effects.sort_values("Contribution (pp)").copy()
     fig = go.Figure(go.Bar(
         x=ranked["Contribution (pp)"], y=ranked["Feature"], orientation="h",
@@ -85,7 +85,7 @@ def explain_selected(features: pd.DataFrame, artifact: dict, probability: float)
     probability_chart(baseline, effects, probability)
     with st.expander("Feature contributions and values", expanded=False):
         st.dataframe(effects, hide_index=True, use_container_width=True)
-    with st.expander("All 10 engineered model features"):
+    with st.expander("All predictive model features (University School excluded)"):
         st.dataframe(features.T.rename(columns={features.index[0]: "Value"}),
                      use_container_width=True)
 
@@ -93,14 +93,15 @@ def explain_selected(features: pd.DataFrame, artifact: dict, probability: float)
 def result_metrics(scores: pd.DataFrame, threshold: float):
     a, b, c, d = st.columns(4)
     approved = int((scores["Predicted status"] == "Approved").sum())
-    a.metric("Scored applicants", f"{len(scores):,}")
+    n_scored = int(scores["Predicted status"].isin(["Approved", "Not Approved"]).sum())
+    a.metric("Scored applicants", f"{n_scored:,}")
     b.metric("Predicted Approved", f"{approved:,}")
-    c.metric("Predicted Not Approved", f"{len(scores) - approved:,}")
+    c.metric("Predicted Not Approved", f"{n_scored - approved:,}")
     d.metric("Model threshold", f"{threshold:.0%}")
 
 
 def display_table(scores: pd.DataFrame, key: str, selection_callback):
-    columns = ["Student ID", "High School", "Approval %", "Predicted status", "Mean Grade", "County", "Course"]
+    columns = ["Student ID", "High School", "University School", "Approval %", "Predicted status", "Mean Grade", "County", "Course"]
     display = scores.copy()
     display["Approval %"] = display["Approval probability"] * 100.0
     event = st.dataframe(
@@ -174,6 +175,12 @@ def individual_page(artifact):
             st.info("Submit the form to view the probability, provisional prediction, and SHAP explanation.")
             return
         record = score.scores.iloc[0]
+        st.markdown("#### Programme and university school")
+        st.write(f"**Programme:** {record['Programme level']}  ·  **University School:** {record['University School']}")
+        if record["Predicted status"] in ("Not Eligible", "Manual Review"):
+            st.warning(f"{record['Predicted status']}: {record['Check notes']}")
+            st.info("No ML probability or SHAP explanation is generated for this programme.")
+            return
         st.markdown("#### Model result")
         a, b = st.columns(2)
         a.metric("Predicted approval probability", f"{record['Approval probability']:.2%}")
@@ -231,12 +238,13 @@ def batch_page(artifact):
             st.download_button("Download invalid rows report", batch.errors.to_csv(index=False),
                                file_name="fao_invalid_rows.csv", mime="text/csv")
     if batch.scores.empty:
-        st.error("No valid applicant rows to score.")
+        st.error("No valid applicant rows in the CSV.")
         return
     result_metrics(batch.scores, float(artifact.get("threshold", 0.5)))
     scores = batch.scores.sort_values("Approval probability", ascending=False, kind="stable")
     shortlisted = scores[scores["Predicted status"] == "Approved"].reset_index(drop=True)
     not_shortlisted = scores[scores["Predicted status"] == "Not Approved"].reset_index(drop=True)
+    out_of_scope = scores[scores["Predicted status"].isin(["Not Eligible", "Manual Review"])].reset_index(drop=True)
 
     main, side = st.columns([1.24, 1], gap="large")
     with main:
@@ -268,16 +276,29 @@ def batch_page(artifact):
             display_table(not_shortlisted, "not_shortlist_table", not_shortlist_clicked)
             st.download_button("Export predicted Not Approved", csv_download(not_shortlisted),
                                file_name="fao_predicted_not_shortlisted.csv", mime="text/csv")
-        st.download_button("Export all scored applicants", csv_download(scores),
+        if not out_of_scope.empty:
+            st.divider()
+            st.markdown("#### Programme ineligible / manual review")
+            st.caption("Not machine-scored; not the same as predicted Not Approved.")
+            st.dataframe(out_of_scope[["Student ID", "High School", "University School",
+                                       "Course", "Programme level", "Predicted status"]],
+                         hide_index=True, use_container_width=True)
+            st.download_button("Export programme review list", csv_download(out_of_scope),
+                               file_name="fao_programme_review.csv", mime="text/csv")
+        st.download_button("Export all processed applicants", csv_download(scores),
                            file_name="fao_all_predictions.csv", mime="text/csv")
     with side:
         st.markdown("#### Selected applicant · SHAP explanation")
-        valid_rows = scores["_row_number"].astype(int).tolist()
+        valid_rows = list(batch.features.index.astype(int))
+        if not valid_rows:
+            st.info("No eligible applicants were scored; SHAP explanations are unavailable.")
+            return
         selected_row = st.session_state.get("selected_csv_row")
         if selected_row not in valid_rows:
             selected_row = valid_rows[0]
         selected = scores[scores["_row_number"] == selected_row].iloc[0]
-        st.caption(f"Student: {selected['Student ID']} · original CSV row {selected_row}")
+        st.caption(f"Student: {selected['Student ID']} · High School: {selected['High School']} · "
+                   f"University School: {selected['University School']} · original CSV row {selected_row}")
         st.metric("Predicted approval probability", f"{selected['Approval probability']:.2%}")
         st.caption(f"Classification: {selected['Predicted status']} · "
                    "This is a model output, not an award decision.")
@@ -288,9 +309,10 @@ def batch_page(artifact):
 
 
 st.title("FAO  |  Scholarship Decision Support")
-st.caption("Historical approval model · Gradient Boosting · Research prototype")
-st.info("Outputs are historical approval predictions, **not scholarship eligibility decisions**. "
-        "Staff should review the evidence and policy criteria before shortlisting or awards.",
+st.caption("Historical approval model · Gradient Boosting (School-free) · Research prototype")
+st.info("Programme scope is checked separately; eligible applicants receive historical approval predictions, "
+        "not award decisions. University School remains visible but is excluded from the model and SHAP. "
+        "Staff must review evidence and policy before shortlisting or awards.",
         icon="ℹ️")
 try:
     artifact = get_model()
@@ -302,7 +324,8 @@ with st.sidebar:
     st.markdown("### Model information")
     st.write(f"**Model:** {artifact.get('model_name', 'Unknown')}")
     st.write(f"**Decision threshold:** {artifact.get('threshold', 0.5):.0%}")
-    st.write(f"**Original features:** {len(artifact['feature_columns'])}")
+    st.write(f"**Predictive features:** {len(artifact['feature_columns'])}")
+    st.caption("University School is display-only. Programme eligibility is a separate rule.")
     st.caption("Uses the same src.data_pipeline.build_features() as FastAPI.")
     st.markdown("---")
     st.warning("Local prototype only. Restrict access before using real applicant records; "

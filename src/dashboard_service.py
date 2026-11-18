@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from src.data_pipeline import (GRADE_SCORES, PARENT_STATUS_SCORES,
-                               build_features, normalized_key)
+                               build_features, normalized_key, classify_programme, FEATURE_COLUMNS)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT_PATH = PROJECT_ROOT / "artifacts" / "scholarship_model.joblib"
@@ -54,6 +54,8 @@ def load_artifact(path: Path = ARTIFACT_PATH) -> dict[str, Any]:
                 "school_categories", "faculty_schools"}
     if not isinstance(artifact, dict) or not required.issubset(artifact):
         raise ValueError("Model artifact does not match the current scholarship pipeline")
+    if artifact.get("schema_version") != "3.0" or list(artifact["feature_columns"]) != FEATURE_COLUMNS:
+        raise ValueError("Old model artifact detected. Retrain with python -m src.train (v3)")
     if not all(hasattr(artifact["model"], method) for method in ("predict_proba", "named_steps")):
         raise ValueError("Expected a fitted preprocessing + classification pipeline")
     return artifact
@@ -111,7 +113,7 @@ def _record_to_model_row(record: pd.Series, artifact: dict[str, Any]) -> tuple[d
     if normalized_key(high_school) not in artifact["school_categories"]:
         notes.append("High school not mapped; model uses UNKNOWN category")
     if normalized_key(course) not in artifact["faculty_schools"]:
-        notes.append("Course not mapped; model uses UNKNOWN university school")
+        notes.append("Course not mapped to university school; showing UNKNOWN in dashboard")
     model_row = {
         "Mean Grade": grade, "O LEVEL YEAR": o_level_year,
         "County": county, "Parent Status": parent,
@@ -122,60 +124,80 @@ def _record_to_model_row(record: pd.Series, artifact: dict[str, Any]) -> tuple[d
 
 
 def score_applicants(df: pd.DataFrame, artifact: dict[str, Any]) -> ScoringResult:
-    """Validate and score rows. Bad rows go to errors; good rows keep stable row numbers."""
+    """Validate inputs, apply programme policy, score only eligible students.
+
+    School is display-only; programme_eligible is a decision rule and is never
+    included in model.predict_proba or SHAP features.
+    """
     clean = canonicalize_columns(df)
-    good_rows: list[dict] = []
+    scoring_rows: list[dict] = []
     metadata: list[dict] = []
     failures: list[dict] = []
     for i, record in enumerate(clean.to_dict(orient="records"), start=1):
         s = pd.Series(record)
-        student_id = record.get("student_id", "")
+        student_id = record.get("student_id")
         if pd.isna(student_id) or not str(student_id).strip():
             student_id = f"Row {i}"
         else:
             student_id = str(student_id).strip()
         try:
             transformed_row, notes = _record_to_model_row(s, artifact)
-            good_rows.append({"_row_number": i, **transformed_row})
+            level, eligibility = classify_programme(transformed_row["Course"])
+            university_school = artifact["faculty_schools"].get(
+                normalized_key(transformed_row["Course"]), "UNKNOWN")
+            if eligibility == 1:
+                scoring_rows.append({"_row_number": i, **transformed_row})
+            else:
+                notes.append("Programme not scored; requires eligibility decision" if eligibility is None
+                             else "Programme outside eligible degree/diploma/CPA scope")
             metadata.append({
                 "_row_number": i, "Student ID": student_id,
                 "Mean Grade": transformed_row["Mean Grade"],
                 "County": transformed_row["County"],
                 "High School": transformed_row["High School"],
+                "University School": str(university_school),
                 "Course": transformed_row["Course"],
+                "Programme level": level,
+                "programme_eligible": eligibility,
                 "Check notes": "; ".join(notes),
             })
         except (ValueError, TypeError) as error:
             failures.append({"CSV row": i, "Student ID": student_id, "Error": str(error)})
 
-    empty_scores = pd.DataFrame(columns=["_row_number", "Student ID", "Approval probability",
-                                          "Predicted status", "Not approved probability"])
-    empty_features = pd.DataFrame(columns=artifact["feature_columns"])
     errors = pd.DataFrame(failures, columns=["CSV row", "Student ID", "Error"])
-    if not good_rows:
-        return ScoringResult(empty_scores, empty_features, errors)
+    scores = pd.DataFrame(metadata)
+    empty_features = pd.DataFrame(columns=artifact["feature_columns"])
+    if scores.empty:
+        return ScoringResult(scores, empty_features, errors)
 
-    model_rows = pd.DataFrame(good_rows).set_index("_row_number")
-    features = build_features(model_rows, artifact["county_rates"],
-                              artifact["school_categories"], artifact["faculty_schools"])
+    scores["Approval probability"] = np.nan
+    scores["Not approved probability"] = np.nan
+    scores["Predicted status"] = scores["programme_eligible"].map(
+        lambda v: "Not Eligible" if v == 0 else "Manual Review" if pd.isna(v) else "Pending Model")
+    if not scoring_rows:
+        return ScoringResult(scores, empty_features, errors)
+
+    raw = pd.DataFrame(scoring_rows).set_index("_row_number")
+    features = build_features(raw, artifact["county_rates"], artifact["school_categories"])
     features = features.loc[:, artifact["feature_columns"]]
     labels = list(artifact["model"].classes_)
-    if 1 not in labels or 0 not in labels:
-        raise ValueError("Model must have class labels 0 and 1 for approval outcomes")
-    proba = artifact["model"].predict_proba(features)[:, labels.index(1)]
-    threshold = float(artifact.get("threshold", 0.5))
+    if 0 not in labels or 1 not in labels:
+        raise ValueError("Model classes must be 0 and 1")
+    probs = artifact["model"].predict_proba(features)[:, labels.index(1)]
+    threshold = float(artifact.get("threshold", .5))
     if not 0 < threshold < 1:
-        raise ValueError("Artifact threshold must be between 0 and 1")
-    scores = pd.DataFrame(metadata)
-    scores["Approval probability"] = np.asarray(proba, dtype=float)
-    scores["Not approved probability"] = 1.0 - scores["Approval probability"]
-    scores["Predicted status"] = np.where(scores["Approval probability"] >= threshold,
-                                           "Approved", "Not Approved")
+        raise ValueError("Invalid decision threshold in artifact")
+    p_map = dict(zip(features.index, map(float, probs)))
+    mask = scores["_row_number"].isin(p_map)
+    scores.loc[mask, "Approval probability"] = scores.loc[mask, "_row_number"].map(p_map)
+    scores.loc[mask, "Not approved probability"] = 1 - scores.loc[mask, "Approval probability"]
+    scores.loc[mask, "Predicted status"] = np.where(
+        scores.loc[mask, "Approval probability"] >= threshold, "Approved", "Not Approved")
     return ScoringResult(scores, features, errors)
 
 
 def get_feature_groups(preprocessor, original_columns: list[str]) -> list[str]:
-    """Map transformed (including one-hot) columns back to 10 original model features."""
+    """Map transformed columns to the nine predictive features (not School)."""
     total = len(preprocessor.get_feature_names_out())
     groups: list[str | None] = [None] * total
     for branch, transformer, columns in preprocessor.transformers_:

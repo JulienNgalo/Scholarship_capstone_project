@@ -4,7 +4,7 @@ Run from the Scholarship Project root:
     python explain_shap.py
     python explain_shap.py --applicants-json examples/shap_applicants.json
 
-This script does not train or replace the deployed model or modify the API.
+This script explains the v3 School-free artifact and never modifies the API.
 SHAP values are probability contributions for historical *approval* (class 1),
 not causal effects or determinations of eligibility.
 """
@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import shap
 
-from src.data_pipeline import build_features
+from src.data_pipeline import build_features, classify_programme, FEATURE_COLUMNS
 
 ROOT = Path(__file__).resolve().parent
 ARTIFACT = ROOT / "artifacts" / "scholarship_model.joblib"
@@ -81,11 +81,15 @@ def load_applicants(path: Path) -> tuple[pd.DataFrame, list[str]]:
     if not isinstance(payload, list) or not payload or any(not isinstance(x, dict) for x in payload):
         raise ValueError("Applicants JSON must be one object or a nonempty list of objects")
     rows, labels = [], []
-    required = ["mean_grade", "o_level_year", "county", "date_applied", "high_school"]
+    required = ["mean_grade", "o_level_year", "county", "date_applied", "high_school", "course"]
     for i, person in enumerate(payload):
         missing = [x for x in required if x not in person]
         if missing:
             raise ValueError(f"Applicant {i+1} missing required API fields: {missing}")
+        level, eligible = classify_programme(person["course"])
+        if eligible != 1:
+            print(f"Skipping SHAP for applicant {i+1}: {level} (not model-scored)")
+            continue
         date = pd.to_datetime(person["date_applied"], errors="raise")
         rows.append({
             "Mean Grade": person["mean_grade"],
@@ -97,6 +101,8 @@ def load_applicants(path: Path) -> tuple[pd.DataFrame, list[str]]:
             "Apply_Year": date.year,
         })
         labels.append(str(person.get("test_id", f"Applicant {i+1}")))
+    if not rows:
+        raise ValueError("No programme-eligible applicants to explain")
     return pd.DataFrame(rows), labels
 
 
@@ -150,11 +156,14 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     artifact = joblib.load(args.artifact)  # Load only your own trusted model artifact.
     model = artifact["model"]
-    if artifact.get("model_name") != "Gradient Boosting":
+    if artifact.get("schema_version") != "3.0" or list(artifact.get("feature_columns", [])) != FEATURE_COLUMNS:
+        raise ValueError("SHAP requires the newly trained v3 School-free artifact")
+    if not artifact.get("model_name", "").startswith("Gradient Boosting"):
         raise ValueError("This script expects the deployed Gradient Boosting model")
     preprocessor = model.named_steps["preprocessor"]
     classifier = model.named_steps["classifier"]
     columns = list(artifact["feature_columns"])
+    assert "School" not in columns, "University School must not appear in model explanations"
     training = pd.read_csv(args.training_csv)
     missing = set(columns).difference(training.columns)
     if missing:
@@ -192,7 +201,7 @@ def main() -> None:
 
     input_rows, labels = load_applicants(args.applicants_json)
     applicant_features = build_features(input_rows, artifact["county_rates"],
-                                       artifact["school_categories"], artifact["faculty_schools"])
+                                       artifact["school_categories"])
     applicant_features = applicant_features[columns]
     Zlocal = np.asarray(preprocessor.transform(applicant_features), dtype=float)
     local_exp = explainer(Zlocal, check_additivity=False)
