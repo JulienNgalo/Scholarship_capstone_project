@@ -1,1 +1,0 @@
-"""Scholarship outcome modeling package."""
