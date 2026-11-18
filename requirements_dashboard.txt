@@ -1,0 +1,6 @@
+# Install alongside the SAME Python interpreter where your FastAPI model works.
+streamlit>=1.41,<2
+plotly>=5.20,<7
+shap>=0.47,<1
+# numpy, pandas, joblib and scikit-learn are already provided by the ML environment.
+# Keep the scikit-learn version compatible with the saved .joblib artifact.

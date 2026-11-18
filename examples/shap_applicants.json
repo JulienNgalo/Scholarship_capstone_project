@@ -1,0 +1,12 @@
+[
+  {"test_id":"Test 1","mean_grade":"A","o_level_year":2025,"county":"Nairobi","date_applied":"2026-11-18T10:00:00","high_school":"Alliance High School","parent_status":"Both Parents","course":"Bachelor of Commerce"},
+  {"test_id":"Test 2","mean_grade":"A-","o_level_year":2024,"county":"Kiambu","date_applied":"2026-11-18T10:00:00","high_school":"Alliance Girls High School","parent_status":"Mother Deceased","course":"Bachelor of Laws"},
+  {"test_id":"Test 3","mean_grade":"B+","o_level_year":2023,"county":"Kisumu","date_applied":"2026-11-18T10:00:00","high_school":"Kisumu Day Sec Sch","parent_status":"Father Deceased","course":"Bachelor of Business Information Technology"},
+  {"test_id":"Test 4","mean_grade":"B","o_level_year":2022,"county":"Homa Bay","date_applied":"2026-11-18T10:00:00","high_school":"Agoro Sare High School","parent_status":"Both Parents","course":"Bachelor of Science in Hospitality Management"},
+  {"test_id":"Test 5","mean_grade":"B-","o_level_year":2021,"county":"Bungoma","date_applied":"2026-11-18T10:00:00","high_school":"Kibabii High School","parent_status":"Orphan","course":"Bachelor of Science in Electrical and Electronics Engineering"},
+  {"test_id":"Test 6","mean_grade":"C+","o_level_year":2020,"county":"Turkana","date_applied":"2026-11-18T10:00:00","high_school":"Baragoi Boys Secondary School","parent_status":"Mother Deceased","course":"Bachelor of Business Science in Actuarial Science"},
+  {"test_id":"Test 7","mean_grade":"C","o_level_year":2019,"county":"Wajir","date_applied":"2026-11-18T10:00:00","high_school":"British International School","parent_status":"Both Parents","course":"Bachelor of Arts International Studies"},
+  {"test_id":"Test 8","mean_grade":"C-","o_level_year":2018,"county":"Mombasa","date_applied":"2026-11-18T10:00:00","high_school":"Aga Khan High School","parent_status":"Father Deceased","course":"Bachelor of Science in Telecommunications"},
+  {"test_id":"Test 9","mean_grade":"D+","o_level_year":2025,"county":"Siaya","date_applied":"2026-11-18T10:00:00","high_school":"Unlisted Demonstration Secondary School","parent_status":"Orphan","course":"Bachelor of Science in Supply Chain and Operations Management"},
+  {"test_id":"Test 10","mean_grade":"A LEVELS","o_level_year":2023,"county":"Mandera","date_applied":"2026-11-18T10:00:00","high_school":"Crawford International School Kenya","parent_status":"Both Parents","course":"Bachelor of Science in Informatics and Computer Science"}
+]
