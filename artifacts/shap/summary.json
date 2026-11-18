@@ -1,0 +1,46 @@
+{
+  "model": "Gradient Boosting",
+  "artifact_version": "2.0",
+  "model_threshold": 0.5,
+  "shap_method": "TreeExplainer / interventional / probability output",
+  "shap_units": "probability change; 0.01 equals one percentage point",
+  "background_rows": 100,
+  "global_explained_rows": 300,
+  "input_features": [
+    "O LEVEL YEAR",
+    "Apply_Year",
+    "County Rate",
+    "mean_grade_score",
+    "high_school_category_score",
+    "o_level_apply_score",
+    "parent_status_score",
+    "Parent Status",
+    "High School Category",
+    "School"
+  ],
+  "transformed_feature_count": 29,
+  "max_probability_reconstruction_error": 7.0701130505668175e-09,
+  "top_5_features_mean_abs_percentage_points": [
+    {
+      "feature": "Apply_Year",
+      "mean_abs_percentage_points": 8.330288452913493
+    },
+    {
+      "feature": "School",
+      "mean_abs_percentage_points": 3.5951223766831104
+    },
+    {
+      "feature": "O LEVEL YEAR",
+      "mean_abs_percentage_points": 3.1325955697321053
+    },
+    {
+      "feature": "High School Category",
+      "mean_abs_percentage_points": 2.28724804157075
+    },
+    {
+      "feature": "mean_grade_score",
+      "mean_abs_percentage_points": 2.0715237905194264
+    }
+  ],
+  "caveat": "Explains historical approval predictions, not causality, deservingness, or eligibility."
+}
