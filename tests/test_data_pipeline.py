@@ -13,4 +13,10 @@ def test_notebook_scores():
     assert features['o_level_apply_score'].tolist()==[5,0]
     assert features['high_school_category_score'].tolist()==[5,4]
     assert features['parent_status_score'].tolist()==[4,1]
-    assert features['School'].tolist()==['SBS','UNKNOWN']
+    #assert features['School'].tolist()==['SBS','UNKNOWN']
+    # Confirm that School is excluded from model inputs
+    assert "School" not in features.columns
+
+    # Confirm that only the intended predictive features are returned
+    from src.data_pipeline import FEATURE_COLUMNS
+    assert features.columns.tolist() == FEATURE_COLUMNS 
