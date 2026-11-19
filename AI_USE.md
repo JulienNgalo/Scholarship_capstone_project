@@ -1,17 +1,22 @@
 # AI assistance disclosure
 
-An AI coding assistant (Copilot SDK in VS Code) assisted with preparing this
-reproducible project package. Its contributions included drafting and refining
-the data-pipeline, model-training, API, container, test, and documentation
-files, plus helping validate those files against the existing project data and
-notebook.
+An AI assistant using Copilot SDK in VS Code and Chatgpt assisted with this project.
 
-The existing applicant data, school classifications, and exploratory notebook
-were present in the project before this packaging work; this assistance did not
-create or independently verify those source records or labels. The model
-approach is documented in the project README. All generated code, model
-outputs, and results should be reviewed by the student before submission.
+Assistance included:
 
-This disclosure describes the assistance used in this project package. Update
-it if other AI tools or AI-generated content were used, and follow the course's
-specific disclosure format and rules.
+- packaging the notebook workflow into a reusable data pipeline and training
+  script;
+- drafting and refining the FastAPI service, Docker configuration, tests, and
+  project documentation;
+- explaining how to create and use the serialized `joblib` model, run the API,
+  interpret the health endpoint, and troubleshoot Docker and Python execution
+  commands; and
+- reviewing command output and helping verify the documented test and
+  training workflows.
+
+The applicant data, school classifications, exploratory notebook, and source
+labels were provided by the student and were not created or independently
+verified by the AI assistant. The student remains responsible for the data,
+feature choices, model evaluation, generated artifacts, conclusions, and final submission. All AI-assisted code and outputs must be reviewed and tested by the student.
+
+This disclosure should be updated if other AI tools or AI-generated content are used, and it should be checked against the course's required disclosure format and rules.
