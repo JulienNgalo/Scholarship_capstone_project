@@ -1,3 +1,0 @@
-test_id,prediction,approval_probability,approval_probability_pct,baseline_probability,shap_reconstruction,threshold,SHAP_pp | O LEVEL YEAR,SHAP_pp | Apply_Year,SHAP_pp | County Rate,SHAP_pp | mean_grade_score,SHAP_pp | high_school_category_score,SHAP_pp | o_level_apply_score,SHAP_pp | parent_status_score,SHAP_pp | Parent Status,SHAP_pp | High School Category
-Example 1,Approved,0.5252515040840741,52.525,0.5711037598557286,0.5252515030521209,0.5,-2.08089,2.34512,-2.63265,-3.40024,0.01697,-0.09097,-0.46909,-0.32807,2.0546
-Example 2,Approved,0.8696033366575281,86.96,0.5711037598557286,0.8696033381747406,0.5,2.91069,-2.32371,8.44428,8.12449,7.49429,1.55164,-0.23136,-0.45439,4.33402

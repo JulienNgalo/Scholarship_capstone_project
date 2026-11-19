@@ -3,3 +3,24 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ipynb_checkpoints/
+
+# Confidential data
+data/
+
+# Trained models and generated artifacts
+artifacts/
+*.joblib
+*.pkl
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+.venv/
+
+# Python temporary files
+__pycache__/
+.ipynb_checkpoints/
+
+# Local Docker configuration
+docker.env.local

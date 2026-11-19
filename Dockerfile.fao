@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+# Local-only research demonstration. Only source code/dependencies enter the image.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    MPLCONFIGDIR=/tmp/matplotlib \
+    NUMBA_CACHE_DIR=/tmp/numba \
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+WORKDIR /app
+
+# Use the dependencies supplied with the v3 project.
+COPY requirements.txt requirements_dashboard.txt ./
+#RUN python -m pip install --no-cache-dir -r requirements_dashboard.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt -r requirements_dashboard.txt
+
+
+# Exact scikit-learn version used to create joblib is important for compatibility.
+# Pass the version via docker.env.local / compose.fao.yaml.
+ARG SCIKIT_LEARN_VERSION=""
+RUN if [ -n "$SCIKIT_LEARN_VERSION" ]; then \
+        python -m pip install --no-cache-dir "scikit-learn==$SCIKIT_LEARN_VERSION"; \
+    fi && python -m pip check
+
+RUN groupadd --system appgroup && \
+    useradd --system --create-home --uid 10001 --gid appgroup appuser && \
+    mkdir -p /app/src /app/artifacts /app/.streamlit && \
+    chown -R appuser:appgroup /app
+
+# No COPY . . : never bake raw data, student records, notebooks or model into image.
+COPY --chown=appuser:appgroup dashboard.py ./dashboard.py
+COPY --chown=appuser:appgroup src/__init__.py src/data_pipeline.py src/dashboard_service.py src/api.py ./src/
+COPY --chown=appuser:appgroup .streamlit/config.toml ./.streamlit/config.toml
+
+USER appuser
+EXPOSE 8501 8001
+CMD ["python", "-m", "streamlit", "run", "dashboard.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]
