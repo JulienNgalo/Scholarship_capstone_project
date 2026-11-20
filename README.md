@@ -87,26 +87,63 @@ Student identifiers help enforce group separation during validation but are not 
 
 ## 4. Modelling, evaluation and interpretation
 
-The research compares **Logistic Regression, Random Forest, XGBoost, and Gradient Boosting**. The deployed v3 estimator is **Gradient Boosting** with preprocessing fitted within its scikit-learn pipeline.
+The research investigates **Logistic Regression, Random Forest, XGBoost, and Gradient Boosting**. The deployed **v3 estimator is Gradient Boosting**, with the same feature engineering and preprocessing used in the research notebook and the saved model pipeline.
 
-Validation uses a held-out portion of student groups and grouped cross-validation so multiple records belonging to the same student cannot appear on both sides of a split. Reapplications are handled through explicit data-quality rules rather than automatically assuming that every repeated student record is an exact duplicate.
+### Validated data split
 
-### Reported experimental ROC-AUC comparison
+Validation uses a student-group-aware holdout split with **no overlap in student IDs** between development and holdout data. Five-fold group-aware cross-validation is performed on the development portion only. This reduces the risk of information leakage between repeat applications from the same student.
 
-The following ROC-AUC values are from the project's supplied model-comparison results. **They are not a substitute for the saved, version-specific v3 holdout metrics**; consult the regenerated holdout report when describing the exact deployed model.
-
-| Model | ROC-AUC |
+| Validation measure | Verified count |
 | --- | ---: |
-| Logistic Regression | 0.6164 |
-| Random Forest | 0.6267 |
-| XGBoost | 0.6018 |
-| **Gradient Boosting** | **0.6314** |
+| Eligible applicant records | 2,241 |
+| Development records | 1,792 |
+| Holdout records | 449 |
+| Unique development students | 1,685 |
+| Unique holdout students | 424 |
+| Student IDs appearing in both sets | **0** |
 
-These values indicate **modest discrimination**, not readiness for automated decisions. Other measures—including precision, recall, F1, confusion matrices, subgroup error rates and calibration—are necessary to judge practical usefulness. Models can also reproduce historical allocation biases.
+Source: `artifacts/split_summary.json` from the verified v3 run.
 
-**Explainability:** SHAP is used to describe how the trained model's features contribute to a particular probability prediction. SHAP explanations describe model behaviour and **do not establish causal effects**.
+### Final model comparison — held-out evaluation
 
-**Monitoring and fairness:** The project investigates performance differences across applicant subgroups and compares feature distributions using measures such as PSI and total variation distance. Historical subgroup differences are descriptive, and a holdout comparison is **not** the same as monitoring new future applications in production.
+The following results are from the **final, feature-aligned notebook run** comparing four classification models on the scholarship application outcome (`Approved` = positive class). The final Gradient Boosting row also matches the recorded `artifacts/holdout_metrics.json` values to four decimal places. Metrics for the other three models are reported from the notebook output; do not substitute scores from earlier experiments.
+
+| Model | Accuracy | Precision | Recall | F1-score | ROC-AUC |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Logistic Regression | 0.5991 | 0.6125 | 0.7778 | 0.6853 | 0.6127 |
+| Random Forest | 0.5924 | 0.6228 | 0.6944 | 0.6567 | 0.6197 |
+| XGBoost | **0.6147** | **0.6447** | 0.6984 | 0.6705 | 0.6123 |
+| **Gradient Boosting (deployed v3)** | **0.6147** | 0.6215 | **0.8016** | **0.7002** | **0.6455** |
+
+**Interpretation:** Gradient Boosting achieved the highest ROC-AUC, recall and F1-score of the four models. XGBoost obtained the highest precision and tied Gradient Boosting on accuracy. These results demonstrate **modest predictive discrimination**, not evidence that the models can independently determine scholarship eligibility or financial need. The final Gradient Boosting model is used as an aid for **human review**, not an automatic award decision.
+
+### Verified Gradient Boosting holdout results
+
+These are the **final reported v3 holdout metrics**, reproduced to four decimal places in the corrected notebook and recorded in `artifacts/holdout_metrics.json`.
+
+| Evaluation metric | Gradient Boosting |
+| --- | ---: |
+| **Accuracy** | **0.6147 (61.47%)** |
+| **Precision** | **0.6215 (62.15%)** |
+| **Recall** | **0.8016 (80.16%)** |
+| **F1-score** | **0.7002** |
+| **ROC-AUC** | **0.6455** |
+| Precision among 50 highest-scored cases | 0.6600 (66.00%) |
+
+**Confusion matrix** (evaluated at the reported classification threshold):
+
+| Actual historical outcome | Predicted Not Approved | Predicted Approved |
+| --- | ---: | ---: |
+| Not Approved | 74 | 123 |
+| Approved | 50 | 202 |
+
+The model identified **202 of 252 historically approved applications** in the holdout, while 50 were missed. It also predicted approval for **123 of 197 historically not-approved applications**. These figures demonstrate meaningful limitations: the predictions describe patterns in past decisions and **must not** be interpreted as independent evidence of financial need or eligibility.
+
+> **Version consistency:** These comparison results supersede the older exploratory figures (including the previously reported Gradient Boosting ROC-AUC of `0.6314`). Use the latest feature-aligned notebook results and the matching v3 holdout artifacts when reporting final performance; do not mix metrics from earlier dataset, preprocessing or validation versions.
+
+**Explainability:** SHAP describes how the trained model's features contribute to an individual predicted probability. SHAP is an explanation of model behaviour, **not a causal statement** about an applicant's eligibility or circumstances.
+
+**Monitoring and fairness:** The project reviews historical subgroup error rates and compares development/holdout feature distributions using measures such as PSI and total variation distance. Subgroup differences warrant further review; a historical holdout comparison does **not** establish stability or fairness for future applicant cohorts.
 
 ## 5. Project structure
 
@@ -143,7 +180,7 @@ Scholarship Project/
 **Prerequisites:** Python **3.12**, Git, and (for the Docker option) Docker Desktop running Linux containers. Commands below are for **PowerShell** from the project root.
 
 ```powershell
-# Clone only if you have authorised access to the private repository.
+# Clone only if you are authorised to access the repository and its contents.
 git clone https://github.com/JulienNgalo/Scholarship_capstone_project.git
 Set-Location Scholarship_capstone_project
 
@@ -158,7 +195,7 @@ python -m pip install pytest
 
 For macOS/Linux, activate the virtual environment using `source .venv/bin/activate` instead.
 
-> The repository does **not** include a safe-to-share copy of the institutional training dataset or generated model artifacts. An authorised reviewer needs access to the required local source files to reproduce real-data training. The automated tests do **not** require those files.
+> A public, safe-to-share copy of institutional training data and generated model artifacts is **not provided**. An authorised reviewer needs access to the required local source files to reproduce real-data training. The automated tests do **not** require those files. Files from older commits may still be reachable in Git history and require separate privacy review.
 
 ## 7. Reproduce the pipeline and model
 
@@ -184,7 +221,7 @@ The training procedure generates or refreshes local files such as:
 - `artifacts/split_summary.json` and `artifacts/data_audit.json` — validation and cleaning summaries.
 - `artifacts/training_data.csv` — **development/training-only feature background** used by SHAP, not the reserved holdout set.
 
-File availability can depend on the code version and whether the relevant generation step completed. **Use metrics from the artifacts generated by the same model run**; do not mix reports from earlier notebook experiments with current v3 holdout results.
+File availability can depend on the code version and whether the relevant generation step completed. **Use metrics from the artifacts generated by the same model run**; do not mix reports from earlier notebook experiments with current v3 holdout results. The verified results in Section 4 use `artifacts/holdout_metrics.json` and `artifacts/split_summary.json`; running training again may generate different results if inputs, code, package versions, or parameters have changed.
 
 **Step 4 — Create offline SHAP outputs (optional).**
 
